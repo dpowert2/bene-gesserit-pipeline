@@ -256,9 +256,50 @@
       border-radius: 100px;
       margin-left: auto;
     }
+
+    /* ── Password Gate ── */
+    #pw-gate { position: fixed; inset: 0; z-index: 9999; background: var(--bg-page); display: flex; align-items: center; justify-content: center; }
+    #pw-gate.unlocked { display: none; }
+    .pw-box { text-align: center; max-width: 360px; padding: 48px 32px; }
+    .pw-box h2 { font-family: 'Instrument Serif', serif; font-size: 1.8rem; color: var(--text-heading); margin-bottom: 8px; }
+    .pw-box p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px; }
+    .pw-box input { width: 100%; padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; background: var(--bg-card); color: var(--text); outline: none; }
+    .pw-box input:focus { border-color: var(--brown); }
+    .pw-box .pw-err { font-size: 0.78rem; color: var(--coral); margin-top: 8px; min-height: 1.2em; }
+    .pw-box button { margin-top: 16px; padding: 10px 32px; border: none; border-radius: 100px; background: var(--text-heading); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .pw-box button:hover { background: var(--brown); }
+
+    /* ── Feedback Modal ── */
+    #fb-btn { position: fixed; bottom: 24px; right: 80px; width: 44px; height: 44px; border-radius: 50%; background: var(--brown); color: #fff; border: none; font-size: 1.2rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 200; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
+    #fb-btn:hover { background: var(--brown-dark); }
+    #fb-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; }
+    #fb-overlay.open { display: flex; }
+    .fb-modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 480px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+    .fb-modal h3 { font-family: 'Instrument Serif', serif; font-size: 1.4rem; color: var(--text-heading); margin-bottom: 4px; }
+    .fb-modal .fb-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 20px; }
+    .fb-modal select { width: 100%; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; background: var(--bg-card); color: var(--text); margin-bottom: 12px; outline: none; }
+    .fb-modal textarea { width: 100%; height: 120px; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; background: var(--bg-card); color: var(--text); resize: vertical; outline: none; }
+    .fb-modal textarea:focus, .fb-modal select:focus { border-color: var(--brown); }
+    .fb-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+    .fb-actions button { padding: 8px 24px; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .fb-cancel { background: none; border: 1px solid var(--border-strong); color: var(--text-muted); }
+    .fb-cancel:hover { border-color: var(--brown); color: var(--brown); }
+    .fb-submit { background: var(--text-heading); border: none; color: #fff; }
+    .fb-submit:hover { background: var(--brown); }
+    .fb-status { font-size: 0.78rem; color: var(--accent-dark); margin-top: 8px; min-height: 1.2em; }
 </style>
 </head>
 <body>
+
+<div id="pw-gate">
+  <div class="pw-box">
+    <h2>Bene Gesserit</h2>
+    <p>Enter password to access the pipeline.</p>
+    <input type="password" id="pw-input" placeholder="Password" autocomplete="off" />
+    <div class="pw-err" id="pw-err"></div>
+    <button onclick="checkPassword()">Enter</button>
+  </div>
+</div>
 
 <nav class="run-nav">
   <div class="container">
@@ -980,9 +1021,81 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('voter-name-input').addEventListener('keydown', e => {if (e.key === 'Enter') saveSettings();});
   document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
   document.getElementById('btn-cancel-settings').addEventListener('click', closeSettings);
+  document.getElementById('fb-overlay').addEventListener('click', e => {if (e.target.id === 'fb-overlay') closeFeedback();});
   loadVotes();
 });
+
+/* ── Password Gate Logic ── */
+const BG_PW_HASH = '083f2a24d6014289d15b37930cb382d9703a5c9829460ddc7a2f9637c669c684';
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function checkPassword() {
+  const input = document.getElementById('pw-input');
+  const hash = await sha256(input.value);
+  if (hash === BG_PW_HASH) {
+    sessionStorage.setItem('bg_auth', 'true');
+    document.getElementById('pw-gate').classList.add('unlocked');
+  } else {
+    document.getElementById('pw-err').textContent = 'Incorrect password.';
+    input.value = '';
+    input.focus();
+  }
+}
+(function() {
+  const inp = document.getElementById('pw-input');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') checkPassword(); });
+  if (sessionStorage.getItem('bg_auth') === 'true') {
+    document.getElementById('pw-gate').classList.add('unlocked');
+  }
+})();
+
+/* ── Feedback Form Logic ── */
+function openFeedback() { document.getElementById('fb-overlay').classList.add('open'); document.getElementById('fb-text').focus(); }
+function closeFeedback() { document.getElementById('fb-overlay').classList.remove('open'); document.getElementById('fb-status').textContent = ''; }
+async function submitFeedback() {
+  const type = document.getElementById('fb-type').value;
+  const text = document.getElementById('fb-text').value.trim();
+  if (!text) { document.getElementById('fb-status').textContent = 'Please enter some feedback.'; return; }
+  const btn = document.querySelector('.fb-submit');
+  btn.textContent = 'Sending…'; btn.disabled = true;
+  try {
+    const _f = window._origFetch || fetch;
+    const r = await _f(`${SUPABASE_URL}/rest/v1/bg_thesis_feedback`, {
+      method: 'POST', headers: {...SB_HEADERS, 'Prefer': 'return=minimal'},
+      body: JSON.stringify({feedback_type: type, feedback: text})
+    });
+    if (!r.ok) throw new Error(r.status);
+    document.getElementById('fb-status').textContent = 'Feedback saved.';
+    document.getElementById('fb-text').value = '';
+    setTimeout(closeFeedback, 1200);
+  } catch (e) {
+    document.getElementById('fb-status').textContent = 'Error saving feedback.';
+  } finally { btn.textContent = 'Submit'; btn.disabled = false; }
+}
 </script>
+
+<button id="fb-btn" onclick="openFeedback()" title="Give feedback on thesis or search strategy">💬</button>
+
+<div id="fb-overlay">
+  <div class="fb-modal">
+    <h3>Strategy Feedback</h3>
+    <p class="fb-sub">This feedback shapes the investment thesis and search terms. The strategy agent reads it twice a week.</p>
+    <select id="fb-type">
+      <option value="thesis">Thesis direction</option>
+      <option value="search_terms">Search terms / gaps</option>
+      <option value="scoring">Scoring / ranking</option>
+      <option value="general">General feedback</option>
+    </select>
+    <textarea id="fb-text" placeholder="What should change? What are we missing? What's working?"></textarea>
+    <div class="fb-status" id="fb-status"></div>
+    <div class="fb-actions">
+      <button class="fb-cancel" onclick="closeFeedback()">Cancel</button>
+      <button class="fb-submit" onclick="submitFeedback()">Submit</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
